@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-time File Sharing</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    .file-container {
+      margin: 20px;
+      display: flex;
+      align-items: center;
+    }
+    .file-container input[type="checkbox"] {
+      margin-right: 10px;
+    }
+    .hidden {
+      display: none;
+    }
+    #dropArea {
+      border: 2px dashed #ccc;
+      border-radius: 20px;
+      width: 80%;
+      margin: 20px auto;
+      padding: 20px;
+      text-align: center;
+    }
+    #dropArea.hover {
+      border-color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Real-time File Sharing</h1>
+
+  <!-- File Upload Form -->
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" id="fileInput" name="files" multiple required />
+  </form>
+
+  <!-- Drag-and-drop area -->
+  <div id="dropArea">Drag & Drop Files Here or Click to Upload</div>
+
+  <!-- Select, Delete, Download Selected, Delete All, Download All buttons -->
+  <button id="selectFilesBtn">Select Files</button>
+  <button id="deleteSelectedBtn" class="hidden">Delete Selected</button>
+  <button id="downloadSelectedBtn" class="hidden">Download Selected</button> <!-- New download button -->
+  <button id="deleteAllFilesBtn">Delete All Files</button>
+  <button id="downloadAllFilesBtn">Download All Files</button>
+
+  <h2>Uploaded Files:</h2>
+  <div id="fileList"></div>
+
+  <script>
+    const socket = io();
+    const fileList = document.getElementById('fileList');
+    const selectFilesBtn = document.getElementById('selectFilesBtn');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    const downloadSelectedBtn = document.getElementById('downloadSelectedBtn'); // New button reference
+    const deleteAllFilesBtn = document.getElementById('deleteAllFilesBtn');
+    const downloadAllFilesBtn = document.getElementById('downloadAllFilesBtn');
+    const fileInput = document.getElementById('fileInput');
+    const dropArea = document.getElementById('dropArea');
+    let selectingFiles = false;
+
+    // Toggle file selection mode
+    selectFilesBtn.addEventListener('click', () => {
+      selectingFiles = !selectingFiles;
+      const checkboxes = document.querySelectorAll('.file-checkbox');
+      checkboxes.forEach(checkbox => {
+        checkbox.classList.toggle('hidden', !selectingFiles);
+      });
+      deleteSelectedBtn.classList.toggle('hidden', !selectingFiles);
+      downloadSelectedBtn.classList.toggle('hidden', !selectingFiles); // Toggle download button visibility
+    });
+
+    // Handle file deletion
+    deleteSelectedBtn.addEventListener('click', async () => {
+      const selectedFiles = Array.from(document.querySelectorAll('.file-checkbox:checked'));
+      if (selectedFiles.length === 0) {
+        alert('Please select at least one file to delete or download.');
+        return;
+      }
+
+      const fileIdsToDelete = selectedFiles.map(file => file.getAttribute('data-file-id'));
+
+      try {
+        const response = await fetch('/delete-files', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ fileIds: fileIdsToDelete }),
+        });
+
+        if (response.ok) {
+          alert('Files deletion initiated');
+        } else {
+          const errorMessage = await response.text();
+          alert(`Failed to delete files: ${errorMessage}`);
+        }
+      } catch (error) {
+        alert(`An error occurred: ${error.message}`);
+      }
+    });
+
+    // New functionality: Handle download of selected files
+    downloadSelectedBtn.addEventListener('click', () => {
+      const selectedFiles = Array.from(document.querySelectorAll('.file-checkbox:checked'));
+      if (selectedFiles.length === 0) {
+        alert('Please select at least one file to download.');
+        return;
+      }
+
+      // Download each selected file
+      selectedFiles.forEach(file => {
+        const fileId = file.getAttribute('data-file-id');
+        const fileUrl = document.querySelector(`[data-file-id="${fileId}"] a`).href; // Get download URL
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = ''; // This will prompt for download
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+    });
+
+    // Handle delete all files
+    deleteAllFilesBtn.addEventListener('click', async () => {
+      const confirmation = confirm("Are you sure you want to delete all files?");
+      if (!confirmation) return;
+
+      try {
+        const response = await fetch('/delete-all-files', {
+          method: 'POST',
+        });
+
+        if (response.ok) {
+          alert('All files deletion initiated');
+        } else {
+          const errorMessage = await response.text();
+          alert(`Failed to delete all files: ${errorMessage}`);
+        }
+      } catch (error) {
+        alert(`An error occurred: ${error.message}`);
+      }
+    });
+
+    // Handle download all files
+    downloadAllFilesBtn.addEventListener('click', () => {
+      window.location.href = '/download-all'; // Trigger download
+    });
+
+    // Handle file uploads when files are selected via input
+    fileInput.addEventListener('change', () => {
+      handleFileUpload(fileInput.files);
+      fileInput.value = ''; // Clear the file input after upload
+    });
+
+    // Handle file uploads when files are dropped or selected from drag-and-drop
+    dropArea.addEventListener('click', () => {
+      fileInput.click(); // Trigger the file input click
+    });
+
+    dropArea.addEventListener('dragover', (event) => {
+      event.preventDefault(); // Prevent default to allow drop
+      dropArea.classList.add('hover');
+    });
+
+    dropArea.addEventListener('dragleave', () => {
+      dropArea.classList.remove('hover');
+    });
+
+    dropArea.addEventListener('drop', (event) => {
+      event.preventDefault(); // Prevent default behavior (open as link)
+      dropArea.classList.remove('hover');
+      const files = event.dataTransfer.files;
+      handleFileUpload(files);
+    });
+
+    // Function to handle file upload
+    async function handleFileUpload(files) {
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append('files', file);
+      }
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (response.ok) {
+          alert('Files uploaded successfully');
+        } else {
+          const errorMessage = await response.text();
+          alert(`File upload failed: ${errorMessage}`);
+        }
+      } catch (error) {
+        alert(`An error occurred: ${error.message}`);
+      }
+    }
+
+    // Function to display files
+    function displayFiles(files) {
+      files.forEach(file => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-container';
+        fileItem.setAttribute('data-file-id', file.fileId);
+        fileItem.innerHTML = `
+          <input type="checkbox" class="file-checkbox hidden" data-file-id="${file.fileId}" />
+          <p>${file.fileName}</p>
+          <a href="${file.fileUrl}" download>Download</a>
+        `;
+        fileList.appendChild(fileItem);
+      });
+    }
+
+    // Listen for 'filesUploaded' event from the server (for new uploads)
+    socket.on('filesUploaded', (files) => {
+      displayFiles(files);
+    });
+
+    // Listen for 'fileDeleted' event from the server (to remove deleted files in real-time)
+    socket.on('fileDeleted', (fileId) => {
+      if (fileId === 'all') {
+        fileList.innerHTML = ''; // Clear the file list when all files are deleted
+      } else {
+        const fileItem = document.querySelector(`[data-file-id="${fileId}"]`);
+        if (fileItem) {
+          fileItem.remove(); // Remove the file from the list
+        }
+      }
+    });
+
+    // Receive initial list of uploaded files when page loads
+    socket.on('initialFiles', (files) => {
+      displayFiles(files);
+    });
+  </script>
+</body>
+</html>

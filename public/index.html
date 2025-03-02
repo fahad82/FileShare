@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FileShare - Upload Files</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    /* Reset and base styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+    
+    /* Header styles */
+    header {
+      width: 100%;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 1rem 0;
+    }
+    
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .logo-container {
+      display: flex;
+      align-items: center;
+    }
+    
+    .file-btn {
+      background-color: #1e2756;
+      color: white;
+      padding: 0.5rem 1rem;
+      font-weight: bold;
+    }
+    
+    .share-btn {
+      background-color: #ffc107;
+      color: #1e2756;
+      padding: 0.5rem 1rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+    }
+    
+    .share-icon {
+      margin-left: 0.25rem;
+    }
+    
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+    }
+    
+    .nav-links a {
+      color: #4b5563;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    
+    .nav-links a:hover {
+      color: #1e2756;
+    }
+    
+    /* Main content */
+    main {
+      flex: 1;
+      padding: 2rem 0;
+    }
+    
+    h1 {
+      font-size: 1.875rem;
+      font-weight: bold;
+      margin-bottom: 1.5rem;
+    }
+    
+    p {
+      margin-bottom: 1rem;
+    }
+    
+    /* File share styles */
+    .file-container {
+      margin: 20px 0;
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    
+    .file-container input[type="checkbox"] {
+      margin-right: 10px;
+    }
+    
+    .file-container p {
+      flex: 1;
+      margin: 0;
+    }
+    
+    .file-container a {
+      color: #1e2756;
+      text-decoration: none;
+    }
+    
+    .file-container a:hover {
+      text-decoration: underline;
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    /* Redesigned drop area to match the image */
+    #dropArea {
+      border: 2px dashed #ccc;
+      border-radius: 20px;
+      width: 100%;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 40px 20px;
+      text-align: center;
+      background-color: #f9f9f9;
+      cursor: pointer;
+      transition: border-color 0.3s;
+    }
+    
+    #dropArea.hover {
+      border-color: #333;
+    }
+    
+    .drop-icon {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 20px;
+    }
+    
+    .drop-text {
+      font-size: 18px;
+      color: #4b5563;
+      line-height: 1.5;
+    }
+    
+    /* Button styles */
+    .btn-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .btn-primary {
+      background-color: #1e2756;
+      color: white;
+    }
+    
+    .btn-danger {
+      background-color: #dc2626;
+      color: white;
+    }
+    
+    .btn-success {
+      background-color: #10b981;
+      color: white;
+    }
+    
+    .btn:hover {
+      opacity: 0.9;
+    }
+    
+    /* Footer styles */
+    footer {
+      width: 100%;
+      border-top: 1px solid #e5e7eb;
+      padding: 1.5rem 0;
+      margin-top: auto;
+    }
+    
+    .footer-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .footer-logo {
+      margin-bottom: 1rem;
+    }
+    
+    .footer-nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2rem;
+      margin: 1rem 0;
+    }
+    
+    .footer-nav a {
+      color: #4b5563;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    
+    .footer-nav a:hover {
+      color: #1e2756;
+    }
+    
+    .copyright {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-top: 1rem;
+    }
+    
+    /* Responsive styles */
+    @media (min-width: 768px) {
+      .footer-content {
+        flex-direction: row;
+        justify-content: space-between;
+      }
+      
+      .footer-logo {
+        margin-bottom: 0;
+      }
+      
+      .copyright {
+        margin-top: 0;
+      }
+    }
+
+    .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .modal.hidden {
+    display: none;
+  }
+
+  .modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  #closeModal {
+    margin-top: 10px;
+    padding: 5px 10px;
+    background: #1e2756;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-content">
+        <div class="logo-container">
+          <div class="file-btn">FILE</div>
+          <div class="share-btn">
+            SHARE
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="20" 
+              height="20" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              stroke-width="2" 
+              stroke-linecap="round" 
+              stroke-linejoin="round" 
+              class="share-icon"
+            >
+              <path d="m22 2-7 20-4-9-9-4Z" />
+              <path d="M22 2 11 13" />
+            </svg>
+          </div>
+        </div>
+        
+        <nav class="nav-links">
+          <a href="#">Overview</a>
+          <a href="#">How To Use</a>
+          <a href="#">Faqs</a>
+          <a href="#">Feedback</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+  
+  <main class="container">
+    <h1>Real-time File Sharing</h1>
+
+    <!-- File Upload Form -->
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="fileInput" name="files" multiple required class="hidden" />
+    </form>
+
+    <!-- Redesigned Drag-and-drop area to match the image -->
+    <div id="dropArea">
+      <div class="drop-icon">
+        <!-- Unicorn icon/image -->
+        <img src="/skatgirl.gif" alt="FileShare icon" width="100" height="100">
+
+
+      </div>
+      <div class="drop-text">
+        <p>Drag and Drop files Or Browse your files</p>
+        <p>To upload on FileShare</p>
+      </div>
+    </div>
+
+    <!-- File management buttons -->
+    <div class="btn-container">
+      <button id="selectFilesBtn" class="btn btn-primary">Select Files</button>
+      <button id="deleteSelectedBtn" class="btn btn-danger hidden">Delete Selected</button>
+      <button id="downloadSelectedBtn" class="btn btn-success hidden">Download Selected</button>
+      <button id="deleteAllFilesBtn" class="btn btn-danger">Delete All Files</button>
+      <button id="downloadAllFilesBtn" class="btn btn-success">Download All Files</button>
+    </div>
+
+    <h2>Uploaded Files:</h2>
+    <div id="fileList"></div>
+
+    <!-- Modal Structure -->
+<div id="popupModal" class="modal hidden">
+  <div class="modal-content">
+    <p id="modalMessage"></p>
+    <button id="closeModal">OK</button>
+  </div>
+</div>
+  </main>
+  
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-logo">
+          <div class="logo-container">
+            <div class="file-btn">FILE</div>
+            <div class="share-btn">
+              SHARE
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="20" 
+                height="20" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                stroke-width="2" 
+                stroke-linecap="round" 
+                stroke-linejoin="round" 
+                class="share-icon"
+              >
+                <path d="m22 2-7 20-4-9-9-4Z" />
+                <path d="M22 2 11 13" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        
+        <nav class="footer-nav">
+          <a href="#">Overview</a>
+          <a href="#">How To Use</a>
+          <a href="#">Faqs</a>
+          <a href="#">Feedback</a>
+        </nav>
+        
+        <div class="copyright">
+          © <script>document.write(new Date().getFullYear())</script> Your Company. All rights reserved.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    const socket = io();
+    const fileList = document.getElementById('fileList');
+    const selectFilesBtn = document.getElementById('selectFilesBtn');
+    const deleteSelectedBtn = document.getElementById('deleteAllFilesBtn');
+    const downloadAllBtn = document.getElementById('downloadAllFilesBtn');
+    const fileInput = document.getElementById('fileInput');
+    const dropArea = document.getElementById('dropArea');
+    let selectingFiles = false;
+  
+    // Toggle file selection mode
+    selectFilesBtn.addEventListener('click', () => {
+      selectingFiles = !selectingFiles;
+      document.querySelectorAll('.file-checkbox').forEach(checkbox => {
+        checkbox.classList.toggle('hidden', !selectingFiles);
+      });
+      deleteSelectedBtn.classList.toggle('hidden', !selectingFiles);
+    });
+  
+    // Handle file deletion
+    deleteSelectedBtn.addEventListener('click', async () => {
+      const selectedFiles = Array.from(document.querySelectorAll('.file-checkbox:checked'));
+      if (selectedFiles.length === 0) {
+        alert('Please select at least one file to delete.');
+        return;
+      }
+  
+      const fileIdsToDelete = selectedFiles.map(file => file.getAttribute('data-file-id'));
+  
+      try {
+        const response = await fetch('/delete-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileIds: fileIdsToDelete }),
+        });
+  
+        if (response.ok) {
+          alert('Files deleted successfully');
+        } else {
+          const errorMessage = await response.text();
+          alert(`Failed to delete files: ${errorMessage}`);
+        }
+      } catch (error) {
+        alert(`An error occurred: ${error.message}`);
+      }
+    });
+  
+    // Handle file uploads
+    fileInput.addEventListener('change', () => {
+      handleFileUpload(fileInput.files);
+      fileInput.value = ''; // Clear input after upload
+    });
+  
+    dropArea.addEventListener('click', () => fileInput.click());
+    dropArea.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      dropArea.classList.add('hover');
+    });
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('hover'));
+    dropArea.addEventListener('drop', (event) => {
+      event.preventDefault();
+      dropArea.classList.remove('hover');
+      handleFileUpload(event.dataTransfer.files);
+    });
+  
+    async function handleFileUpload(files) {
+      const formData = new FormData();
+      for (const file of files) formData.append('files', file);
+  
+      try {
+        const response = await fetch('/upload', { method: 'POST', body: formData });
+        response.ok ? alert('Files uploaded successfully') : alert(`Upload failed: ${await response.text()}`);
+      } catch (error) {
+        alert(`An error occurred: ${error.message}`);
+      }
+    }
+  
+    function addFileToList(file) {
+      const fileItem = document.createElement('div');
+      fileItem.className = 'file-container';
+      fileItem.setAttribute('data-file-id', file.fileId);
+      fileItem.innerHTML = `
+        <input type="checkbox" class="file-checkbox hidden" data-file-id="${file.fileId}" />
+        <p>${file.fileName} - <span id="timer-${file.fileId}">Calculating...</span></p>
+        <a href="${file.fileUrl}" download>Download</a>
+      `;
+      fileList.appendChild(fileItem);
+    }
+  
+    function displayFiles(files) {
+      files.forEach(file => {
+        if (!document.querySelector(`[data-file-id="${file.fileId}"]`)) {
+          addFileToList(file);
+        }
+      });
+    }
+  
+    // **Download All Files**
+    downloadAllBtn.addEventListener('click', () => {
+      window.location.href = '/download-all';
+    });
+  
+    // Real-time updates
+    socket.on('filesUploaded', (newFiles) => {
+      displayFiles(newFiles);
+    });
+  
+    socket.on('fileDeleted', (fileId) => {
+      if (fileId === 'all') {
+        fileList.innerHTML = ''; // Clear all files if all are deleted
+      } else {
+        const fileItem = document.querySelector(`[data-file-id="${fileId}"]`);
+        fileItem?.remove();
+      }
+    });
+  
+    socket.on('fileTimerUpdate', ({ fileId, remainingTime }) => {
+      const timerElement = document.getElementById(`timer-${fileId}`);
+      if (timerElement) {
+        timerElement.textContent = formatTime(remainingTime);
+      }
+    });
+  
+    function formatTime(ms) {
+      let totalSeconds = Math.floor(ms / 1000);
+      let hours = Math.floor(totalSeconds / 3600);
+      let minutes = Math.floor((totalSeconds % 3600) / 60);
+      let seconds = totalSeconds % 60;
+      return `${hours}h ${minutes}m ${seconds}s`;
+    }
+  
+    // Fetch initial files
+    socket.on('initialFiles', displayFiles);
+  </script>
+
+  
+  <script>
+    const popupModal = document.getElementById("popupModal");
+    const modalMessage = document.getElementById("modalMessage");
+    const closeModal = document.getElementById("closeModal");
+  
+    closeModal.addEventListener("click", () => {
+      popupModal.classList.add("hidden");
+    });
+  
+    function showPopup(message) {
+      modalMessage.textContent = message;
+      popupModal.classList.remove("hidden");
+    }
+  
+    async function handleFileUpload(files) {
+      const formData = new FormData();
+      for (const file of files) formData.append("files", file);
+  
+      try {
+        const response = await fetch("/upload", { method: "POST", body: formData });
+        if (response.ok) {
+          showPopup("Files uploaded successfully");
+        } else {
+          showPopup(`Upload failed: ${await response.text()}`);
+        }
+      } catch (error) {
+        showPopup(`An error occurred: ${error.message}`);
+      }
+    }
+  </script>
+  
+
+
+</body>
+</html>
